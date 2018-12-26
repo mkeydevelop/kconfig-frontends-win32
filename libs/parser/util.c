@@ -34,6 +34,8 @@ struct file *file_lookup(const char *name)
 /* write a dependency file as used by kbuild to track dependencies */
 int file_write_dep(const char *name)
 {
+	char *str;
+	char buf[PATH_MAX+1], buf2[PATH_MAX+1], dir[PATH_MAX+1];
 	struct symbol *sym, *env_sym;
 	struct expr *e;
 	struct file *file;
@@ -41,7 +43,16 @@ int file_write_dep(const char *name)
 
 	if (!name)
 		name = ".kconfig.d";
-	out = fopen("..config.tmp", "w");
+
+	strcpy(dir, conf_get_configname());
+	str = strrchr(dir, '/');
+	if (str)
+		str[1] = 0;
+	else
+		dir[0] = 0;
+
+	sprintf(buf, "%s..config.tmp", dir);
+	out = fopen(buf, "w");
 	if (!out)
 		return 1;
 	fprintf(out, "deps_config := \\\n");
@@ -72,7 +83,8 @@ int file_write_dep(const char *name)
 
 	fprintf(out, "\n$(deps_config): ;\n");
 	fclose(out);
-	rename("..config.tmp", name);
+	sprintf(buf2, "%s%s", dir, name);
+	rename(buf, buf2);
 	return 0;
 }
 

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "lkc.h"
 
@@ -29,7 +30,7 @@ static void conf_message(const char *fmt, ...)
 static const char *conf_filename;
 static int conf_lineno, conf_warnings, conf_unsaved;
 
-const char conf_defname[] = "arch/$ARCH/defconfig";
+const char conf_defname[] = ".defconfig";
 
 static void conf_warning(const char *fmt, ...)
 {
@@ -74,9 +75,7 @@ const char *conf_get_configname(void)
 
 const char *conf_get_autoconfig_name(void)
 {
-	char *name = getenv("KCONFIG_AUTOCONFIG");
-
-	return name ? name : "include/config/auto.conf";
+	return getenv("KCONFIG_AUTOCONFIG");
 }
 
 static char *conf_expand_value(const char *in)
@@ -746,6 +745,9 @@ int conf_write(const char *name)
 	char dirname[PATH_MAX+1], tmpname[PATH_MAX+1], newname[PATH_MAX+1];
 	char *env;
 
+	if (!name)
+		name = conf_get_configname();
+
 	dirname[0] = 0;
 	if (name && name[0]) {
 		struct stat st;
@@ -845,6 +847,7 @@ static int conf_split_config(void)
 {
 	const char *name;
 	char path[PATH_MAX+1];
+	char *opwd, *dir, *_name;
 	char *s, *d, c;
 	struct symbol *sym;
 	struct stat sb;
@@ -853,8 +856,20 @@ static int conf_split_config(void)
 	name = conf_get_autoconfig_name();
 	conf_read_simple(name, S_DEF_AUTO);
 
-	if (chdir("include/config"))
+	opwd = malloc(256);
+	_name = strdup(name);
+	if (opwd == NULL || _name == NULL)
 		return 1;
+	opwd = getcwd(opwd, 256);
+	dir = dirname(_name);
+	if (dir == NULL) {
+		res = 1;
+		goto err;
+	}
+	if (chdir(dir)) {
+		res = 1;
+		goto err;
+	}
 
 	res = 0;
 	for_all_symbols(i, sym) {
@@ -947,9 +962,11 @@ static int conf_split_config(void)
 		close(fd);
 	}
 out:
-	if (chdir("../.."))
-		return 1;
-
+	if (chdir(opwd))
+		res = 1;
+err:
+	free(opwd);
+	free(_name);
 	return res;
 }
 
@@ -959,25 +976,38 @@ int conf_write_autoconf(void)
 	const char *name;
 	FILE *out, *tristate, *out_h;
 	int i;
+	char dir[PATH_MAX+1], buf[PATH_MAX+1];
+	char *s;
+
+	strcpy(dir, conf_get_configname());
+	s = strrchr(dir, '/');
+	if (s)
+		s[1] = 0;
+	else
+		dir[0] = 0;
 
 	sym_clear_all_valid();
 
-	file_write_dep("include/config/auto.conf.cmd");
+	sprintf(buf, "%s.config.cmd", dir);
+	file_write_dep(buf);
 
 	if (conf_split_config())
 		return 1;
 
-	out = fopen(".tmpconfig", "w");
+	sprintf(buf, "%s.tmpconfig", dir);
+	out = fopen(buf, "w");
 	if (!out)
 		return 1;
 
-	tristate = fopen(".tmpconfig_tristate", "w");
+	sprintf(buf, "%s.tmpconfig_tristate", dir);
+	tristate = fopen(buf, "w");
 	if (!tristate) {
 		fclose(out);
 		return 1;
 	}
 
-	out_h = fopen(".tmpconfig.h", "w");
+	sprintf(buf, "%s.tmpconfig.h", dir);
+	out_h = fopen(buf, "w");
 	if (!out_h) {
 		fclose(out);
 		fclose(tristate);
@@ -1009,19 +1039,22 @@ int conf_write_autoconf(void)
 	name = getenv("KCONFIG_AUTOHEADER");
 	if (!name)
 		name = "include/generated/autoconf.h";
-	if (rename(".tmpconfig.h", name))
+	sprintf(buf, "%s.tmpconfig.h", dir);
+	if (rename(buf, name))
 		return 1;
 	name = getenv("KCONFIG_TRISTATE");
 	if (!name)
 		name = "include/config/tristate.conf";
-	if (rename(".tmpconfig_tristate", name))
+	sprintf(buf, "%s.tmpconfig_tristate", dir);
+	if (rename(buf, name))
 		return 1;
 	name = conf_get_autoconfig_name();
 	/*
 	 * This must be the last step, kbuild has a dependency on auto.conf
 	 * and this marks the successful completion of the previous steps.
 	 */
-	if (rename(".tmpconfig", name))
+	sprintf(buf, "%s.tmpconfig", dir);
+	if (rename(buf, name))
 		return 1;
 
 	return 0;

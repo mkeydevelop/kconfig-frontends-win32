@@ -178,9 +178,9 @@ menu_instructions[] = N_(
 	"Arrow keys navigate the menu.  "
 	"<Enter> selects submenus ---> (or empty submenus ----).  "
 	"Highlighted letters are hotkeys.  "
-	"Pressing <Y> includes, <N> excludes, <M> modularizes features.  "
+	"Pressing <Y> selects a feature, while <N> excludes a feature.  "
 	"Press <Esc><Esc> to exit, <?> for Help, </> for Search.  "
-	"Legend: [*] built-in  [ ] excluded  <M> module  < > module capable"),
+	"Legend: [*] feature is selected  [ ] feature is excluded"),
 radiolist_instructions[] = N_(
 	"Use the arrow keys to navigate this window or "
 	"press the hotkey of the item you wish to select "
@@ -961,7 +961,7 @@ static int handle_exit(void)
 	if (conf_get_changed())
 		res = dialog_yesno(NULL,
 				   _("Do you wish to save your new configuration?\n"
-				     "(Press <ESC><ESC> to continue kernel configuration.)"),
+				     "(Press <ESC><ESC> to continue AliOS Things configuration.)"),
 				   6, 60);
 	else
 		res = -1;
@@ -981,7 +981,7 @@ static int handle_exit(void)
 	case -1:
 		printf(_("\n\n"
 			 "*** End of the configuration.\n"
-			 "*** Execute 'make' to start the build or try 'make help'."
+			 "*** Execute 'aos make' to start the build or try 'aos make help'."
 			 "\n\n"));
 		res = 0;
 		break;
