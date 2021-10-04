@@ -36,9 +36,6 @@
 #define CURS_MACROS
 #endif
 
-#ifdef bool
-#  undef bool
-#endif
 #include CURSES_LOC
 
 /*
